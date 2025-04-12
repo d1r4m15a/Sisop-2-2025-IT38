@@ -12,7 +12,7 @@
 #define COMBINED_FILE "Combined.txt"
 #define DECODED_FILE "Decoded.txt"
 
-// Cek apakah nama file valid (1 karakter dan .txt)
+
 int is_valid_single_char_filename(const char *filename) {
     if (strlen(filename) != 5) return 0;
     if (!isalnum(filename[0])) return 0;
