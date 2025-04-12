@@ -6,13 +6,26 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #define FOLDER_NAME "Clues"
 #define FILTERED_FOLDER "Filtered"
 #define COMBINED_FILE "Combined.txt"
 #define DECODED_FILE "Decoded.txt"
 
+void run_command(char *argv[]) {
+    pid_t pid = fork();
+    if (pid == 0) {
+        execvp(argv[0], argv);
+        perror("exec failed");
+        exit(EXIT_FAILURE);
+    } else {
+        int status;
+        waitpid(pid, &status, 0);
+    }
+}
 
+// Cek apakah nama file valid (1 karakter dan .txt)
 int is_valid_single_char_filename(const char *filename) {
     if (strlen(filename) != 5) return 0;
     if (!isalnum(filename[0])) return 0;
@@ -35,20 +48,22 @@ int compare_names(const void *a, const void *b) {
 void download_and_extract() {
     struct stat st = {0};
     if (stat(FOLDER_NAME, &st) == 0 && S_ISDIR(st.st_mode)) {
-        printf("Folder %s sudah ada. Skip download.\n", FOLDER_NAME);
         return;
     }
 
     printf("Mengunduh Clues.zip...\n");
-    system("wget -O Clues.zip \"https://drive.google.com/uc?export=download&id=1xFn1OBJUuSdnApDseEczKhtNzyGekauK\"");
-
+    char *wget_args[] = {"wget", "-O", "Clues.zip", "https://drive.google.com/uc?export=download&id=1xFn1OBJUuSdnApDseEczKhtNzyGekauK", NULL};
+    run_command(wget_args);
 
     printf("Ekstrak Clues.zip...\n");
-    system("unzip Clues.zip > /dev/null");
+    char *unzip_args[] = {"unzip", "Clues.zip", NULL};
+    run_command(unzip_args);
 
     printf("Menghapus Clues.zip...\n");
-    system("rm Clues.zip");
+    char *rm_args[] = {"rm", "Clues.zip", NULL};
+    run_command(rm_args);
 }
+
 
 void filter_files() {
     mkdir(FILTERED_FOLDER, 0777);
@@ -67,11 +82,13 @@ void filter_files() {
             struct stat st;
             if (stat(full_path, &st) == 0 && S_ISREG(st.st_mode)) {
                 if (is_valid_single_char_filename(entry->d_name)) {
-                    snprintf(command, sizeof(command), "mv \"%s\" %s/", full_path, FILTERED_FOLDER);
-                    system(command);
+                    char *mv_args[] = {"mv", full_path, FILTERED_FOLDER, NULL};
+                    run_command(mv_args);
+
                 } else {
-                    snprintf(command, sizeof(command), "rm \"%s\"", full_path);
-                    system(command);
+                    char *rm_args[] = {"rm", full_path, NULL};
+                    run_command(rm_args);
+
                 }
             }
         }
