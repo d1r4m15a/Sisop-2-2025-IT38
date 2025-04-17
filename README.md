@@ -289,7 +289,7 @@ void rot13_decode() {
 ---
 
 ### Ekstra
-> Library yang digunakan:
+_Library yang digunakan:_
 ```
 #include <stdio.h>      // File I/O (fopen, fgets, fprintf, etc.)
 #include <stdlib.h>     // Memory allocation (malloc, free), exit()
@@ -302,9 +302,9 @@ void rot13_decode() {
 #include <sys/wait.h>   // Process control (wait, waitpid)
 ```
 
-> Error handling:
->
-> Prints help text if invalid arguments are given.
+_Error handling:_
+
+Prints help text if invalid arguments are given.
 ```
 Example Output:
 Usage:
