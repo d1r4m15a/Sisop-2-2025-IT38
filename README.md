@@ -1281,7 +1281,13 @@ int main(int argc, char *argv[]) {
 }
 
 ```
-
+![Gmbr1](./assets/Soal_2/setup.png)
+![Gmbr2](./assets/Soal_2/decrypt.png)
+![Gmbr3](./assets/Soal_2/quarantine.png)
+![Gmbr4](./assets/Soal_2/return.png)
+![Gmbr5](./assets/Soal_2/eradicate.png)
+![Gmbr6](./assets/Soal_2/shutdown.png)
+![Gmbr7](./assets/Soal_2/activityLog.png)
 ## Soal 3
 
 
