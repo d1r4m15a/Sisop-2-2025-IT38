@@ -327,11 +327,8 @@ Usage:
 
 
 ## Soal 2
-# Library yang kupakai
 
 Pada suatu hari, Kanade ingin membuat sebuah musik baru bersama anggota grup musiknya, yaitu Mizuki Akiyama, Mafuyu Asahina, dan Ena Shinonome. Namun, sialnya, komputer Kanade terkena virus yang tidak dikenal. Setelah dianalisis secara mendalam, ternyata virus tersebut bukanlah trojan, ransomware, atau tipe virus berbahaya lainnya. Virus itu hanyalah malware biasa yang mampu membuat perangkat menjadi lebih lambat dari biasanya.
-
-gcc starterkit.c -o starterkit -lcurl -lzip
 
 ---
 
@@ -1281,6 +1278,11 @@ int main(int argc, char *argv[]) {
 }
 
 ```
+##Cara menjalankan
+```
+gcc starterkit.c -o starterkit -lcurl -lzip
+```
+##Gambar pendukung
 ![Gmbr1](./assets/Soal_2/setup.png)
 ![Gmbr2](./assets/Soal_2/decrypt.png)
 ![Gmbr3](./assets/Soal_2/quarantine.png)
@@ -1292,3 +1294,977 @@ int main(int argc, char *argv[]) {
 
 
 ## Soal 4
+### Ringkasan Latar Belakang Soal
+
+Soal ini menceritakan tentang Nobita yang menemukan alat bernama Debugmon, sebuah robot pengawas aktivitas user di komputer. Debugmon memiliki 5 fitur utama yang harus diimplementasikan dalam program C:
+
+1. ./debugmon list reiziqzip
+2. ./debugmon daemon reiziqzip
+3. ./debugmon stop reiziqzip
+4. ./debugmon fail reiziqzip
+5. ./debugmon revert reiziqzip
+
+Selain itu, semua aktivitas harus dicatat dalam log bernama debugmon.log dengan format:
+
+```
+[dd:mm:yyyy]-[hh:mm:ss]_nama-proses_STATUS 
+```
+
+## **A. Mengetahui semua aktivitas user (list)**
+
+Fungsinya: Menampilkan semua proses milik user beserta PID, nama proses, CPU usage, dan memory usage.
+
+### Code:
+
+```c
+void do_list(const char *user) {
+    char cmd[128];
+    snprintf(cmd, sizeof(cmd), "ps -u %s -o pid,comm,%%cpu,%%mem", user);
+    FILE *fp = popen(cmd, "r");
+    if (fp == NULL) {
+        perror("Gagal menjalankan ps");
+        return;
+    }
+    char line[256];
+    while (fgets(line, sizeof(line), fp)) {
+        printf("%s", line);
+    }
+    pclose(fp);
+}
+
+```
+
+### Penjelasan:
+
+### 1. Fungsi dan Parameter
+
+```c
+void do_list(const char *user)
+
+```
+
+- Ini adalah **fungsi** yang akan dipanggil ketika kita mengetik ./debugmon list <user>.
+- user adalah **nama user** (misal userku: reiziqzip) yang ingin kita lihat prosesnya.
+
+---
+
+### 2. Menyusun perintah Linux ps
+
+```c
+char cmd[128];
+snprintf(cmd, sizeof(cmd), "ps -u %s -o pid,comm,%%cpu,%%mem", user);
+
+```
+
+- cmd[128] adalah **string** yang akan menyimpan perintah terminal.
+- snprintf() digunakan untuk menggabungkan user ke dalam perintah.
+- Perintah ini akan menjadi:
+    
+    ```bash
+    ps -u reiziqzip -o pid,comm,%cpu,%mem
+    
+    ```
+    
+- ps adalah perintah Linux untuk melihat proses.
+    - u <user> → melihat proses milik user tersebut.
+    - o pid,comm,%cpu,%mem → output-nya hanya menampilkan 4 kolom: ID proses, nama proses, penggunaan CPU dan memori.
+
+---
+
+### 3. Menjalankan perintah dan membaca hasilnya
+
+```c
+FILE *fp = popen(cmd, "r");
+
+```
+
+- popen() = membuka proses eksternal (di sini ps ...) dan **membaca output-nya**.
+- fp adalah pointer ke stream hasil output dari perintah ps.
+
+Jika gagal:
+
+```c
+if (fp == NULL) {
+    perror("Gagal menjalankan ps");
+    return;
+}
+
+```
+
+- Menampilkan error ke terminal jika popen() gagal.
+
+---
+
+### 4. Menampilkan hasil baris per baris
+
+```c
+char line[256];
+while (fgets(line, sizeof(line), fp)) {
+    printf("%s", line);
+}
+
+```
+
+- fgets() membaca **satu baris output** dari hasil ps.
+- Lalu printf() mencetaknya ke layar.
+- Proses ini diulang terus sampai tidak ada baris lagi.
+
+---
+
+### 5. Menutup stream
+
+```c
+pclose(fp);
+
+```
+
+- Menutup proses popen() yang tadi dibuka.
+- Ini penting untuk menghindari kebocoran resource.
+
+---
+
+### Alur Logika Fungsi list
+
+1. Terima input user dari argumen.
+2. Susun perintah terminal ps untuk user tersebut.
+3. Jalankan perintah tersebut menggunakan popen().
+4. Baca hasilnya baris demi baris.
+5. Tampilkan hasilnya ke layar.
+6. Tutup proses pembacaan.
+
+---
+
+## **B. Memasang mata-mata dalam mode daemon (daemon)**
+
+Fungsinya: Menjalankan proses pemantauan yang terus-menerus mencatat proses milik user ke dalam debugmon.log setiap 5 detik.
+
+### code:
+
+```c
+void do_daemon(const char *user) {
+    char failfile[64];
+    snprintf(failfile, sizeof(failfile), "fail.%s", user);
+    if (access(failfile, F_OK) == 0) {
+        printf("User %s sedang dalam mode FAIL. Tidak bisa menjalankan daemon.\n", user);
+        return;
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("Fork gagal");
+        return;
+    }
+
+    if (pid > 0) {
+        FILE *pf = fopen("debugmon.pid", "w");
+        if (pf) {
+            fprintf(pf, "%d", pid);
+            fclose(pf);
+        }
+        printf("Debugmon sedang memantau user: %s (PID: %d)\n", user, pid);
+        return;
+    }
+
+    while (1) {
+        char cmd[128];
+        snprintf(cmd, sizeof(cmd), "ps -u %s -o comm=", user);
+        FILE *fp = popen(cmd, "r");
+        if (fp) {
+            char line[128];
+            while (fgets(line, sizeof(line), fp)) {
+                line[strcspn(line, "\n")] = 0;
+                log_status(line, "RUNNING");
+            }
+            pclose(fp);
+        }
+        sleep(5);
+    }
+}
+
+```
+
+### 1. Mengecek Mode FAIL
+
+```c
+char failfile[64];
+snprintf(failfile, sizeof(failfile), "fail.%s", user);
+if (access(failfile, F_OK) == 0) {
+    printf("User %s sedang dalam mode FAIL. Tidak bisa menjalankan daemon.\n", user);
+    return;
+}
+
+```
+
+📌 Mengecek apakah file fail.<user> ada → artinya user sedang diblokir.
+
+Kalau iya, program langsung keluar dari fungsi (tidak lanjut fork).
+
+---
+
+### 2. Membuat Proses Baru dengan fork()
+
+```c
+pid_t pid = fork();
+
+```
+
+📌 fork() memecah program jadi 2: **parent dan child process**.
+
+- pid > 0 → parent (induk)
+- pid == 0 → child (anak)
+- pid < 0 → error
+
+---
+
+### 3. Di Parent: Simpan PID Anak
+
+```c
+if (pid > 0) {
+    FILE *pf = fopen("debugmon.pid", "w");
+    fprintf(pf, "%d", pid); // simpan PID
+    fclose(pf);
+    return;
+}
+
+```
+
+📌 Parent menyimpan PID child ke file debugmon.pid supaya nanti bisa dihentikan.
+
+---
+
+### 4. Di Child: Loop Monitoring
+
+```c
+while (1) {
+    snprintf(cmd, sizeof(cmd), "ps -u %s -o comm=", user);
+    FILE *fp = popen(cmd, "r");
+    while (fgets(line, sizeof(line), fp)) {
+        line[strcspn(line, "\n")] = 0;
+        log_status(line, "RUNNING");
+    }
+    sleep(5);
+}
+
+```
+
+📌 Program akan terus-menerus:
+
+1. Menjalankan ps untuk melihat semua proses milik user
+2. Membaca nama-nama prosesnya
+3. Menulis ke file debugmon.log dengan status RUNNING
+4. Tidur 5 detik dan ulangi lagi
+
+---
+
+### Output yang Dihasilkan:
+
+Setiap 5 detik, kamu akan mendapatkan log seperti:
+
+```
+[12:04:2025]-[15:30:25]_bash_RUNNING
+[12:04:2025]-[15:30:25]_code_RUNNING
+
+```
+
+---
+
+### Alur Fungsi do_daemon
+
+1. Cek apakah user dalam mode FAIL
+2. Kalau tidak, buat proses baru pakai fork()
+3. Parent → simpan PID daemon ke file
+4. Child → jalankan loop:
+    - Ambil proses
+    - Tulis log
+    - Tunggu 5 detik
+
+---
+
+## **C. Menghentikan pengawasan (stop)**
+
+Fungsinya: Menghentikan daemon yang sedang berjalan.
+
+### code:
+
+```c
+void do_stop() {
+    FILE *pf = fopen("debugmon.pid", "r");
+    if (!pf) {
+        printf("Tidak ditemukan PID file. Debugmon mungkin tidak aktif.\n");
+        return;
+    }
+
+    int pid;
+    fscanf(pf, "%d", &pid);
+    fclose(pf);
+
+    if (kill(pid, SIGTERM) == 0) {
+        printf("Debugmon (PID %d) dihentikan.\n", pid);
+        remove("debugmon.pid");
+    } else {
+        perror("Gagal menghentikan daemon");
+    }
+}
+
+```
+
+### 1. Buka File debugmon.pid
+
+```c
+FILE *pf = fopen("debugmon.pid", "r");
+
+```
+
+📌 Membuka file untuk membaca PID proses daemon.
+
+---
+
+### 2. Baca PID dan Tutup File
+
+```c
+fscanf(pf, "%d", &pid);
+fclose(pf);
+
+```
+
+📌 Membaca nomor PID dari file, lalu menutup file-nya.
+
+---
+
+### 3. Kirim Sinyal SIGTERM ke Proses
+
+```c
+kill(pid, SIGTERM);
+
+```
+
+📌 Ini memberitahu proses daemon: “Silakan mati dengan baik.”
+
+Kalau berhasil, hapus file debugmon.pid.
+
+---
+
+### Alur Fungsi do_stop
+
+1. Buka file debugmon.pid
+2. Baca PID dari file
+3. Kirim sinyal SIGTERM ke PID tersebut
+4. Jika berhasil, hapus file PID
+
+---
+
+## **D. Menggagalkan semua proses user (fail)**
+
+Fungsinya: Membunuh semua proses user (kecuali proses penting) dan mencatat sebagai FAILED ke log.
+
+### code:
+
+```c
+void do_fail(const char *user) {
+    printf("Mematikan semua proses milik user: %s...\n", user);
+
+    char cmd[128];
+    snprintf(cmd, sizeof(cmd), "ps -u %s -o pid=,comm=", user);
+    FILE *fp = popen(cmd, "r");
+    if (fp) {
+        char line[256];
+        while (fgets(line, sizeof(line), fp)) {
+            int pid;
+            char proc[128];
+
+            // Ambil PID dan nama proses (nama bisa panjang, jadi pakai %[^\n])
+            if (sscanf(line, "%d %[^\n]", &pid, proc) != 2) {
+                continue;
+            }
+
+            // Lewatkan proses penting
+            if (strstr(proc, "bash") || strstr(proc, "sh") ||
+                strstr(proc, "debugmon") || strstr(proc, "ps") ||
+                strstr(proc, "sleep")) {
+                printf("Lewatkan proses: %s (PID: %d)\n", proc, pid);
+                continue;
+            }
+
+            // Kirim sinyal kill dan catat ke log
+            if (kill(pid, SIGKILL) == 0) {
+                printf("Membunuh proses: %s (PID: %d)\n", proc, pid);
+                log_status(proc, "FAILED");
+            } else {
+                perror("Gagal membunuh proses");
+            }
+        }
+        pclose(fp);
+    } else {
+        perror("Gagal membuka output ps");
+    }
+
+    // Simpan status mode FAIL ke file
+    char failfile[64];
+    snprintf(failfile, sizeof(failfile), "fail.%s", user);
+    FILE *fail = fopen(failfile, "w");
+    if (fail) fclose(fail);
+
+    printf("User %s sekarang dalam mode FAIL dan tidak bisa menjalankan proses baru.\n", user);
+}
+
+```
+
+---
+
+### Penjelasan
+
+### 1. Cetak pesan
+
+```c
+printf("Mematikan semua proses milik user: %s...\n", user);
+
+```
+
+📌 Memberi tahu user bahwa proses sedang dimatikan.
+
+---
+
+### 2. Jalankan perintah ps untuk dapatkan PID & nama proses user
+
+```c
+snprintf(cmd, sizeof(cmd), "ps -u %s -o pid=,comm=", user);
+FILE *fp = popen(cmd, "r");
+
+```
+
+📌 Perintah ps ini menampilkan:
+
+- pid= → hanya PID
+- comm= → hanya nama proses
+Output-nya dibaca pakai popen() seperti membuka file biasa.
+
+---
+
+### 3. Baca baris demi baris hasil ps
+
+```c
+while (fgets(line, sizeof(line), fp)) {
+
+```
+
+📌 Membaca setiap baris hasil dari perintah ps.
+
+---
+
+### 4. Ambil PID dan nama proses
+
+```c
+sscanf(line, "%d %[^\n]", &pid, proc)
+
+```
+
+📌 sscanf() digunakan untuk memisahkan angka (PID) dan string nama proses.
+
+%[^\n] artinya ambil semua karakter hingga newline (nama proses bisa mengandung spasi).
+
+---
+
+### 5. Lewatkan proses penting (jangan dibunuh)
+
+```c
+if (strstr(proc, "bash") || strstr(proc, "sh") || ... )
+
+```
+
+📌 Digunakan untuk melindungi proses seperti:
+
+- Terminal shell (bash, sh)
+- Program itu sendiri (debugmon)
+- ps dan sleep agar tidak mematikan perintah yang sedang dijalankan
+
+---
+
+### 6. Membunuh proses
+
+```c
+kill(pid, SIGKILL)
+
+```
+
+📌 Mengirim sinyal SIGKILL ke proses. Ini **sinyal paksa**, langsung membunuh proses tanpa bisa menolak.
+
+Jika berhasil, tulis ke log:
+
+```c
+log_status(proc, "FAILED");
+
+```
+
+---
+
+### 7. Simpan file fail.<user>
+
+```c
+snprintf(failfile, sizeof(failfile), "fail.%s", user);
+FILE *fail = fopen(failfile, "w");
+
+```
+
+📌 File ini menjadi penanda bahwa user sedang dalam mode **blokir**.
+
+Fitur lain (seperti daemon) akan mengecek file ini sebelum berjalan.
+
+---
+
+### Alur Fungsi do_fail
+
+1. Ambil semua proses milik user.
+2. Lewatkan proses yang aman.
+3. Proses lainnya dibunuh dengan SIGKILL.
+4. Tulis ke log dengan status FAILED.
+5. Simpan status FAIL user ke file fail.<user>.
+
+---
+
+## **E. Mengizinkan user menjalankan proses kembali (revert)**
+
+Fungsinya: Menghapus mode FAIL agar user bisa menjalankan proses lagi.
+
+### code:
+
+```c
+void do_revert(const char *user) {
+    char failfile[64];
+    snprintf(failfile, sizeof(failfile), "fail.%s", user);
+
+    if (remove(failfile) == 0)
+        printf("User %s keluar dari mode FAIL.\n", user);
+    else
+        printf("User %s tidak dalam mode FAIL.\n", user);
+}
+
+```
+
+---
+
+### Penjelasan Baris per Baris
+
+### 1. Menyusun nama file mode FAIL
+
+```c
+char failfile[64];
+snprintf(failfile, sizeof(failfile), "fail.%s", user);
+
+```
+
+📌 File fail.<user> adalah **penanda** bahwa user sedang dalam mode FAIL.
+
+Contoh: jika user adalah reiziqzip, maka file-nya bernama fail.reiziqzip.
+
+Fungsi snprintf() membuat nama file tersebut dan menyimpannya ke variabel failfile.
+
+---
+
+### 2. Menghapus file dengan remove()
+
+```c
+if (remove(failfile) == 0)
+
+```
+
+📌 remove() adalah fungsi dari C untuk **menghapus file**.
+
+- Jika file fail.<user> berhasil dihapus → artinya user berhasil keluar dari mode FAIL.
+- Jika file tidak ada → artinya user memang tidak sedang dalam mode FAIL.
+
+---
+
+### 3. Menampilkan hasil ke terminal
+
+```c
+printf("User %s keluar dari mode FAIL.\n", user);
+
+```
+
+📌 Memberikan umpan balik kepada pengguna bahwa mode FAIL sudah dicabut.
+
+---
+
+### Alur Fungsi do_revert()
+
+1. Buat nama file fail.<user>.
+2. Coba hapus file tersebut.
+3. Jika berhasil → cetak pesan bahwa user sudah keluar dari mode FAIL.
+4. Jika gagal → cetak pesan bahwa user tidak sedang dalam mode FAIL.
+
+---
+
+## **F. Pencatatan ke dalam Log (log_status)**
+
+Fungsi:
+
+```c
+void log_status(const char *proc, const char *status) {
+    FILE *log = fopen("debugmon.log", "a");
+    if (!log) return;
+
+    time_t t = time(NULL);
+    struct tm *tm_info = localtime(&t);
+
+    char date[20], timebuf[20];
+    strftime(date, sizeof(date), "%d:%m:%Y", tm_info);
+    strftime(timebuf, sizeof(timebuf), "%H:%M:%S", tm_info);
+
+    fprintf(log, "[%s]-[%s]_%s_%s\n", date, timebuf, proc, status);
+    fclose(log);
+}
+
+```
+
+---
+
+### Penjelasan
+
+### 1. Buka file log
+
+```c
+FILE *log = fopen("debugmon.log", "a");
+
+```
+
+📌 Membuka file debugmon.log untuk **menambahkan** isi di akhir file (append).
+
+---
+
+### 2. Ambil waktu sekarang
+
+```c
+time_t t = time(NULL);
+struct tm *tm_info = localtime(&t);
+
+```
+
+📌 Mengambil waktu sistem saat ini dalam bentuk struktur waktu lokal (tm).
+
+---
+
+### 3. Format tanggal dan waktu
+
+```c
+strftime(date, sizeof(date), "%d:%m:%Y", tm_info);
+strftime(timebuf, sizeof(timebuf), "%H:%M:%S", tm_info);
+
+```
+
+📌 Mengubah waktu ke dalam bentuk teks yang bisa ditampilkan.
+
+---
+
+### 4. Tulis ke file
+
+```c
+fprintf(log, "[%s]-[%s]_%s_%s\n", date, timebuf, proc, status);
+
+```
+
+📌 Contoh hasil:
+
+```
+[12:04:2025]-[15:35:00]_firefox_FAILED
+[12:04:2025]-[15:35:05]_bash_RUNNING
+
+```
+
+---
+
+### 5. Tutup file log
+
+```c
+fclose(log);
+
+```
+
+---
+
+### Alur Fungsi log_status
+
+1. Buka file debugmon.log dalam mode tambah.
+2. Ambil waktu sekarang dan ubah jadi string.
+3. Tulis baris log ke file.
+4. Tutup file.
+
+---
+
+## Fungsi main
+
+```c
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        printf("Gunakan: ./debugmon <perintah> <user>\n");
+        return 1;
+    }
+
+    const char *cmd = argv[1];
+    const char *user = (argc > 2) ? argv[2] : NULL;
+
+    if (strcmp(cmd, "list") == 0 && user) tampilkan_proses(user);
+    else if (strcmp(cmd, "daemon") == 0 && user) jalankan_daemon(user);
+    else if (strcmp(cmd, "stop") == 0) hentikan_daemon();
+    else if (strcmp(cmd, "fail") == 0 && user) gagalkan_proses(user);
+    else if (strcmp(cmd, "revert") == 0 && user) kembalikan_user(user);
+    else printf("Perintah tidak dikenali atau user tidak disebutkan.\n");
+
+    return 0;
+}
+
+```
+
+---
+
+## Penjelasan Baris per Baris
+
+### 1. Memeriksa jumlah argumen
+
+```c
+if (argc < 2) {
+    printf("Gunakan: ./debugmon <perintah> <user>\n");
+    return 1;
+}
+
+```
+
+📌 Mengecek apakah pengguna **sudah memasukkan perintah** atau belum.
+
+Kalau tidak, program akan menampilkan petunjuk dan berhenti.
+
+---
+
+### 2. Menyimpan argumen
+
+```c
+const char *cmd = argv[1];
+const char *user = (argc > 2) ? argv[2] : NULL;
+
+```
+
+📌 argv[1] adalah **perintah** (list, daemon, dll)
+
+📌 argv[2] adalah **nama user** (misal: reiziqzip) jika tersedia
+
+---
+
+### 3. Menjalankan fungsi sesuai perintah
+
+```c
+if (strcmp(cmd, "list") == 0 && user)
+    tampilkan_proses(user);
+else if (strcmp(cmd, "daemon") == 0 && user)
+    jalankan_daemon(user);
+...
+
+```
+
+📌 Cek perintah satu per satu:
+
+- Kalau list → panggil tampilkan_proses(user)
+- Kalau daemon → panggil jalankan_daemon(user)
+- dst…
+
+---
+
+### 4. Pesan error jika perintah tidak valid
+
+```c
+else printf("Perintah tidak dikenali atau user tidak disebutkan.\n");
+
+```
+
+📌 Jika perintah tidak cocok dengan salah satu yang ditentukan, tampilkan pesan kesalahan.
+
+---
+
+## Codingan lengkapnya
+
+```cpp
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <signal.h>
+#include <time.h>
+
+void log_status(const char *proc, const char *status) {
+    FILE *log = fopen("debugmon.log", "a");
+    if (!log) return;
+
+    time_t t = time(NULL);
+    struct tm *tm_info = localtime(&t);
+
+    char date[20], timebuf[20];
+    strftime(date, sizeof(date), "%d:%m:%Y", tm_info);
+    strftime(timebuf, sizeof(timebuf), "%H:%M:%S", tm_info);
+
+    fprintf(log, "[%s]-[%s]_%s_%s\n", date, timebuf, proc, status);
+    fclose(log);
+}
+
+void do_list(const char *user) {
+    char cmd[128];
+    snprintf(cmd, sizeof(cmd), "ps -u %s -o pid,comm,%%cpu,%%mem", user);
+
+    FILE *fp = popen(cmd, "r");
+    if (fp == NULL) {
+        perror("Gagal menjalankan ps");
+        return;
+    }
+
+    char line[256];
+    while (fgets(line, sizeof(line), fp)) {
+        printf("%s", line); // tampilkan ke terminal
+    }
+
+    pclose(fp);
+}
+
+void do_daemon(const char *user) {
+    // Check if fail mode active
+    char failfile[64];
+    snprintf(failfile, sizeof(failfile), "fail.%s", user);
+    if (access(failfile, F_OK) == 0) {
+        printf("User %s sedang dalam mode FAIL. Tidak bisa menjalankan daemon.\n", user);
+        return;
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("Fork gagal");
+        return;
+    }
+
+    if (pid > 0) {
+        // parent
+        FILE *pf = fopen("debugmon.pid", "w");
+        if (pf) {
+            fprintf(pf, "%d", pid);
+            fclose(pf);
+        }
+        printf("Debugmon sedang memantau user: %s (PID: %d)\n", user, pid);
+        return;
+    }
+
+    // child (daemon)
+    while (1) {
+        char cmd[128];
+        snprintf(cmd, sizeof(cmd), "ps -u %s -o comm=", user);
+        FILE *fp = popen(cmd, "r");
+        if (fp) {
+            char line[128];
+            while (fgets(line, sizeof(line), fp)) {
+                line[strcspn(line, "\n")] = 0; // trim newline
+                log_status(line, "RUNNING");
+            }
+            pclose(fp);
+        }
+        sleep(5);
+    }
+}
+
+void do_stop() {
+    FILE *pf = fopen("debugmon.pid", "r");
+    if (!pf) {
+        printf("Tidak ditemukan PID file. Debugmon mungkin tidak aktif.\n");
+        return;
+    }
+
+    int pid;
+    fscanf(pf, "%d", &pid);
+    fclose(pf);
+
+    if (kill(pid, SIGTERM) == 0) {
+        printf("Debugmon (PID %d) dihentikan.\n", pid);
+        remove("debugmon.pid");
+    } else {
+        perror("Gagal menghentikan daemon");
+    }
+}
+
+void do_fail(const char *user) {
+    printf("Mematikan semua proses milik user: %s...\n", user);
+
+    char cmd[128];
+    snprintf(cmd, sizeof(cmd), "ps -u %s -o pid=,comm=", user);
+    FILE *fp = popen(cmd, "r");
+    if (fp) {
+        char line[256];
+        while (fgets(line, sizeof(line), fp)) {
+            int pid;
+            char proc[128];
+
+            // Ambil PID dan nama proses (nama bisa panjang, jadi pakai %[^\n])
+            if (sscanf(line, "%d %[^\n]", &pid, proc) != 2) {
+                continue;
+            }
+
+            // Lewatkan proses penting
+            if (strstr(proc, "bash") || strstr(proc, "sh") ||
+                strstr(proc, "debugmon") || strstr(proc, "ps") ||
+                strstr(proc, "sleep")) {
+                printf("Lewatkan proses: %s (PID: %d)\n", proc, pid);
+                continue;
+            }
+
+            // Kirim sinyal kill dan catat ke log
+            if (kill(pid, SIGKILL) == 0) {
+                printf("Membunuh proses: %s (PID: %d)\n", proc, pid);
+                log_status(proc, "FAILED");
+            } else {
+                perror("Gagal membunuh proses");
+            }
+        }
+        pclose(fp);
+    } else {
+        perror("Gagal membuka output ps");
+    }
+
+    // Simpan status mode FAIL ke file
+    char failfile[64];
+    snprintf(failfile, sizeof(failfile), "fail.%s", user);
+    FILE *fail = fopen(failfile, "w");
+    if (fail) fclose(fail);
+
+    printf("User %s sekarang dalam mode FAIL dan tidak bisa menjalankan proses baru.\n", user);
+}
+
+void do_revert(const char *user) {
+    char failfile[64];
+    snprintf(failfile, sizeof(failfile), "fail.%s", user);
+    if (remove(failfile) == 0) {
+        printf("User %s telah keluar dari mode FAIL.\n", user);
+    } else {
+        printf("User %s tidak dalam mode FAIL.\n", user);
+    }
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        printf("Gunakan perintah: list|daemon|stop|fail|revert <user>\n");
+        return 1;
+    }
+
+    const char *cmd = argv[1];
+    const char *user = argc > 2 ? argv[2] : NULL;
+
+    if (strcmp(cmd, "list") == 0 && user) do_list(user);
+    else if (strcmp(cmd, "daemon") == 0 && user) do_daemon(user);
+    else if (strcmp(cmd, "stop") == 0) do_stop();
+    else if (strcmp(cmd, "fail") == 0 && user) do_fail(user);
+    else if (strcmp(cmd, "revert") == 0 && user) do_revert(user);
+    else printf("Perintah tidak dikenali atau user tidak disebutkan.\n");
+
+    return 0;
+}
+
+```
+
+##Gambar Pendukung
+![Gmbr1](./assets/Soal_4/list.png)
+![Gmbr2](./assets/Soal_4/daemon.png)
+![Gmbr3](./assets/Soal_4/stop.png)
+![Gmbr4](./assets/Soal_4/fail.png)
+![Gmbr5](./assets/Soal_4/revert.png)
