@@ -48,15 +48,25 @@ Hapus Clues.zip dengan rm.
 
 ## 2. Filter File (filter_files())
 Tujuan:
+
 Pindahkan file dengan nama 1 huruf/angka + .txt (e.g., a.txt, 1.txt) ke folder Filtered/.
+
 Hapus file yang tidak valid.
+
 Algoritma:
+
 Buat folder Filtered/.
+
 Loop melalui ClueA/ sampai ClueD/:
+
 Baca setiap file di direktori.
+
 Jika nama file valid:
+
 -> Pindahkan ke Filtered/ dengan mv.
+
 Jika tidak valid:
+
 -> Hapus dengan rm.
 
 ``` action.c
@@ -109,6 +119,7 @@ int is_valid_single_char_filename(const char *filename) {
 Tujuan:
 
 Gabungkan isi file di Filtered/ ke Combined.txt dengan urutan:
+
 angka → huruf → angka → huruf (e.g., 1.txt, a.txt, 2.txt, b.txt).
 
 Hapus file aslinya setelah digabung.
