@@ -34,8 +34,12 @@ Ekstrak isinya dan hapus file ZIP.
 ❦ Algoritma:
 
 > Cek apakah folder Clues/ sudah ada.
-> Jika belum:\nGunakan wget untuk download.
+>
+> Jika belum:
+>     Gunakan wget untuk download.
+>
 > Gunakan unzip untuk ekstrak.
+>
 > Hapus Clues.zip dengan rm.
 
 
