@@ -1,6 +1,7 @@
 # Laporan Penjelasan dan Penyelesaian Soal Modul 2
 ## Muqaddimah
 بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ
+
 Segala puji bagi Allah, Rabb semesta alam. Shalawat dan salam semoga tercurah kepada Nabi Muhammad ﷺ, keluarga, sahabat, serta siapa saja yang mengikuti jalan beliau hingga hari kiamat.
 Laporan ini disusun sebagai bentuk tanggung jawab akademik dan ikhtiar dalam menuntut ilmu, sebagaimana sabda Nabi ﷺ:
 "Barangsiapa menempuh jalan untuk menuntut ilmu, niscaya Allah akan mudahkan baginya jalan menuju surga."
