@@ -27,9 +27,9 @@ Semoga Allah memudahkan langkah kita semua dalam menuntut ilmu, mengamalkannya, 
 
 ❦ Tujuan:
 
-Unduh Clues.zip dari Google Drive (jika folder Clues/ belum ada).
-
-Ekstrak isinya dan hapus file ZIP.
+> Unduh Clues.zip dari Google Drive (jika folder Clues/ belum ada).
+>
+> Ekstrak isinya dan hapus file ZIP.
 
 ❦ Algoritma:
 
@@ -46,27 +46,24 @@ Ekstrak isinya dan hapus file ZIP.
 ---
 
 ### 2. Filter File (filter_files())
-Tujuan:
+❦ Tujuan:
 
-Pindahkan file dengan nama 1 huruf/angka + .txt (e.g., a.txt, 1.txt) ke folder Filtered/.
+> Pindahkan file dengan nama 1 huruf/angka + .txt (e.g., a.txt, 1.txt) ke folder Filtered/.
+>
+> Hapus file yang tidak valid.
 
-Hapus file yang tidak valid.
+❦ Algoritma:
 
-Algoritma:
-
-Buat folder Filtered/.
-
-Loop melalui ClueA/ sampai ClueD/:
-
-Baca setiap file di direktori.
-
-Jika nama file valid:
-
--> Pindahkan ke Filtered/ dengan mv.
-
-Jika tidak valid:
-
--> Hapus dengan rm.
+> Buat folder Filtered/.
+>
+> Loop melalui ClueA/ sampai ClueD/:
+>
+> Baca setiap file di direktori.
+>
+> Jika nama file valid:
+>     Pindahkan ke Filtered/ dengan mv.
+> Jika tidak valid:
+>     Hapus dengan rm.
 
 #### Kode
 ``` action.c
