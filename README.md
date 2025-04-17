@@ -23,7 +23,7 @@ Semoga Allah memudahkan langkah kita semua dalam menuntut ilmu, mengamalkannya, 
 |Thariq Kyran Aryunaldi     | 5027241073 |
 
 ## Soal 1
-### 1. Download & Ekstrak (download_and_extract())
+### a. Download & Ekstrak (download_and_extract())
 
 ❦ Tujuan:
 
@@ -78,7 +78,7 @@ void run_command(char *argv[]) {
 
 ---
 
-### 2. Filter File (filter_files())
+### b. Filter File (filter_files())
 ❦ Tujuan:
 
 > Pindahkan file dengan nama 1 huruf/angka + .txt (e.g., a.txt, 1.txt) ke folder Filtered/.
@@ -148,7 +148,7 @@ int is_valid_single_char_filename(const char *filename) {
 
 ---
 
-### 3. Gabungkan File (combine_files())
+### c. Gabungkan File (combine_files())
 ❦ Tujuan:
 
 > Gabungkan isi file di Filtered/ ke Combined.txt dengan urutan:
@@ -245,7 +245,7 @@ void append_file_to_output(const char *file_path, FILE *out) {
 
 ---
 
-### 4. Decode ROT13 (rot13_decode())
+### d. Decode ROT13 (rot13_decode())
 ❦ Tujuan:
 
 > Decode isi Combined.txt dengan cipher ROT13 (geser 13 huruf).
