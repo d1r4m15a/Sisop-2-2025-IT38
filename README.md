@@ -61,8 +61,11 @@ Semoga Allah memudahkan langkah kita semua dalam menuntut ilmu, mengamalkannya, 
 > Baca setiap file di direktori.
 >
 > Jika nama file valid:
+>
 >     Pindahkan ke Filtered/ dengan mv.
+>
 > Jika tidak valid:
+>
 >     Hapus dengan rm.
 
 #### Kode
