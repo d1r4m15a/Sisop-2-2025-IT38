@@ -59,7 +59,8 @@ Jika nama file valid:
 Jika tidak valid:
 -> Hapus dengan rm.
 
-'''action.
+''' action.c
+
 void filter_files() {
     mkdir(FILTERED_FOLDER, 0777); // Buat folder Filtered
     for (char folder = 'A'; folder <= 'D'; folder++) {
