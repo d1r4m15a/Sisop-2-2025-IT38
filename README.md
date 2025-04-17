@@ -105,14 +105,14 @@ void filter_files() {
 
 Fungsi untuk memvalidasi nama file:
 
-'''action.c
+``` action.c
 int is_valid_single_char_filename(const char *filename) {
     // Format: [a-Z0-9].txt (panjang 5: a.txt)
     return (strlen(filename) == 5 && 
             isalnum(filename[0]) && 
             strcmp(filename + 1, ".txt") == 0);
 }
-'''
+```
 
 ---
 
