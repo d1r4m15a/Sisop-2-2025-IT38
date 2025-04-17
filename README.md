@@ -59,7 +59,7 @@ Jika nama file valid:
 Jika tidak valid:
 -> Hapus dengan rm.
 
-''' action.c
+``` action.c
 
 void filter_files() {
     mkdir(FILTERED_FOLDER, 0777); // Buat folder Filtered
@@ -90,7 +90,7 @@ void filter_files() {
         closedir(dir);
     }
 }
-'''
+```
 
 Fungsi untuk memvalidasi nama file:
 
