@@ -25,23 +25,18 @@ Semoga Allah memudahkan langkah kita semua dalam menuntut ilmu, mengamalkannya, 
 ## Soal 1
 ### 1. Download & Ekstrak (download_and_extract())
 
-Tujuan:
+❦ Tujuan:
 
 Unduh Clues.zip dari Google Drive (jika folder Clues/ belum ada).
 
 Ekstrak isinya dan hapus file ZIP.
 
-Algoritma:
+❦ Algoritma:
 
-Cek apakah folder Clues/ sudah ada.
-
-Jika belum:
-
-Gunakan wget untuk download.
-
-Gunakan unzip untuk ekstrak.
-
-Hapus Clues.zip dengan rm.
+> Cek apakah folder Clues/ sudah ada.
+> Jika belum:\nGunakan wget untuk download.
+> Gunakan unzip untuk ekstrak.
+> Hapus Clues.zip dengan rm.
 
 
 ---
