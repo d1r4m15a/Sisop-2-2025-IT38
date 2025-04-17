@@ -1,5 +1,5 @@
 # Laporan Penjelasan dan Penyelesaian Soal Modul 2
-## Muqaddimah
+
 بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ
 
 Segala puji bagi Allah, Rabb semesta alam. Shalawat dan salam semoga tercurah kepada Nabi Muhammad ﷺ, keluarga, sahabat, serta siapa saja yang mengikuti jalan beliau hingga hari kiamat.
