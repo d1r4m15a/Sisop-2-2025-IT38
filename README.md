@@ -289,6 +289,14 @@ void rot13_decode() {
 
 ### Pics
 
+![assets/Screenshot 2025-04-17 183616.png]
+
+![assets/Screenshot 2025-04-17 183629.png]
+
+![assets/Screenshot 2025-04-17 183643.png]
+
+![assets/Screenshot 2025-04-17 183602.png]
+
 ---
 
 ### Ekstra
