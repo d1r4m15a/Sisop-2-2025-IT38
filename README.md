@@ -42,6 +42,39 @@ Semoga Allah memudahkan langkah kita semua dalam menuntut ilmu, mengamalkannya, 
 >
 > Hapus Clues.zip dengan rm.
 
+Kode:
+```
+void download_and_extract() {
+    struct stat st = {0};
+    if (stat(FOLDER_NAME, &st) == 0 && S_ISDIR(st.st_mode)) {
+        return; // Folder sudah ada, skip.
+    }
+
+    // Download Clues.zip
+    char *wget_args[] = {"wget", "-O", "Clues.zip", "https://drive.google.com/...", NULL};
+    run_command(wget_args);
+
+    // Ekstrak
+    char *unzip_args[] = {"unzip", "Clues.zip", NULL};
+    run_command(unzip_args);
+
+    // Hapus ZIP
+    char *rm_args[] = {"rm", "Clues.zip", NULL};
+    run_command(rm_args);
+}
+```
+Fungsi penduikung (run_command):
+```
+void run_command(char *argv[]) {
+    pid_t pid = fork();
+    if (pid == 0) { // Child process
+        execvp(argv[0], argv); // Jalankan perintah (e.g., wget, unzip)
+        exit(EXIT_FAILURE); // Jika execvp gagal
+    } else { // Parent process
+        waitpid(pid, NULL, 0); // Tunggu child selesai
+    }
+}
+```
 
 ---
 
@@ -62,11 +95,11 @@ Semoga Allah memudahkan langkah kita semua dalam menuntut ilmu, mengamalkannya, 
 >
 > Jika nama file valid:
 >
->     Pindahkan ke Filtered/ dengan mv.
+> Pindahkan ke Filtered/ dengan mv.
 >
 > Jika tidak valid:
 >
->     Hapus dengan rm.
+> Hapus dengan rm.
 
 #### Kode
 ``` action.c
@@ -116,53 +149,170 @@ int is_valid_single_char_filename(const char *filename) {
 ---
 
 ### 3. Gabungkan File (combine_files())
-Tujuan:
+❦ Tujuan:
 
-Gabungkan isi file di Filtered/ ke Combined.txt dengan urutan:
+> Gabungkan isi file di Filtered/ ke Combined.txt dengan urutan:
+> 
+> angka → huruf → angka → huruf (e.g., 1.txt, a.txt, 2.txt, b.txt).
+> 
+> Hapus file aslinya setelah digabung.
 
-angka → huruf → angka → huruf (e.g., 1.txt, a.txt, 2.txt, b.txt).
+❦ Algoritma:
 
-Hapus file aslinya setelah digabung.
+> Buka folder Filtered/ dan pisahkan file:
+>
+> digit_files: File dengan nama angka (e.g., 1.txt).
+>
+> alpha_files: File dengan nama huruf (e.g., a.txt).
+> 
+> Urutkan kedua kelompok file.
+> 
+> Gabungkan isinya secara bergantian ke Combined.txt.
+> 
+> Hapus file sumber.
 
-Algoritma:
+Kode:
+```
+void combine_files() {
+    DIR *dir = opendir(FILTERED_FOLDER);
+    if (!dir) return;
 
-Buka folder Filtered/ dan pisahkan file:
+    // Pisahkan file angka dan huruf
+    char *digit_files[128], *alpha_files[128];
+    int d_count = 0, a_count = 0;
 
-digit_files: File dengan nama angka (e.g., 1.txt).
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
 
-alpha_files: File dengan nama huruf (e.g., a.txt).
+        if (isdigit(entry->d_name[0])) {
+            digit_files[d_count++] = strdup(entry->d_name);
+        } else if (isalpha(entry->d_name[0])) {
+            alpha_files[a_count++] = strdup(entry->d_name);
+        }
+    }
+    closedir(dir);
 
-Urutkan kedua kelompok file.
+    // Urutkan file
+    qsort(digit_files, d_count, sizeof(char *), compare_names);
+    qsort(alpha_files, a_count, sizeof(char *), compare_names);
 
-Gabungkan isinya secara bergantian ke Combined.txt.
+    // Gabungkan isi file
+    FILE *out = fopen(COMBINED_FILE, "w");
+    for (int i = 0; i < (d_count > a_count ? d_count : a_count); i++) {
+        if (i < d_count) {
+            char file_path[512];
+            snprintf(file_path, sizeof(file_path), "%s/%s", FILTERED_FOLDER, digit_files[i]);
+            append_file_to_output(file_path, out);
+            remove(file_path); // Hapus file sumber
+            free(digit_files[i]);
+        }
+        if (i < a_count) {
+            char file_path[512];
+            snprintf(file_path, sizeof(file_path), "%s/%s", FILTERED_FOLDER, alpha_files[i]);
+            append_file_to_output(file_path, out);
+            remove(file_path); // Hapus file sumber
+            free(alpha_files[i]);
+        }
+    }
+    fclose(out);
+}
+```
 
-Hapus file sumber.
+Fungsi pendukung:
+
+```
+// Untuk sorting file
+int compare_names(const void *a, const void *b) {
+    const char *fa = *(const char **)a;
+    const char *fb = *(const char **)b;
+    return strcmp(fa, fb); // Urutkan secara leksikografis
+}
+
+// Salin isi file ke output
+void append_file_to_output(const char *file_path, FILE *out) {
+    FILE *in = fopen(file_path, "r");
+    if (!in) return;
+
+    char buffer[1024];
+    while (fgets(buffer, sizeof(buffer), in)) {
+        fputs(buffer, out);
+    }
+    fclose(in);
+}
+```
+
 
 ---
 
 ### 4. Decode ROT13 (rot13_decode())
-Tujuan:
+❦ Tujuan:
 
-Decode isi Combined.txt dengan cipher ROT13 (geser 13 huruf).
+> Decode isi Combined.txt dengan cipher ROT13 (geser 13 huruf).
+>
+> Hasil disimpan di Decoded.txt.
+>
+> Algoritma ROT13:
+> 
+> Untuk setiap karakter:
+> 
+> Jika huruf (A-Z/a-z):
+>
+> Geser 13 posisi (e.g., A → N, n → a).
+>
+> Jika bukan huruf: biarkan as-is.
 
-Hasil disimpan di Decoded.txt.
+Kode:
+```
+void rot13_decode() {
+    FILE *in = fopen(COMBINED_FILE, "r");
+    FILE *out = fopen(DECODED_FILE, "w");
 
-Algoritma ROT13:
+    int c;
+    while ((c = fgetc(in)) != EOF) {
+        if (isalpha(c)) {
+            if (islower(c)) {
+                c = 'a' + (c - 'a' + 13) % 26;
+            } else {
+                c = 'A' + (c - 'A' + 13) % 26;
+            }
+        }
+        fputc(c, out);
+    }
 
-Untuk setiap karakter:
+    fclose(in);
+    fclose(out);
+}
+```
 
-Jika huruf (A-Z/a-z):
-
-Geser 13 posisi (e.g., A → N, n → a).
-
-Jika bukan huruf: biarkan as-is.
 
 ---
 
 ### Ekstra
 > Library yang digunakan:
+```
+#include <stdio.h>      // File I/O (fopen, fgets, fprintf, etc.)
+#include <stdlib.h>     // Memory allocation (malloc, free), exit()
+#include <string.h>     // String operations (strcmp, strdup, strlen)
+#include <sys/stat.h>   // File status (stat, mkdir, S_ISDIR)
+#include <dirent.h>     // Directory operations (opendir, readdir, closedir)
+#include <unistd.h>     // POSIX API (fork, execvp, getpid)
+#include <ctype.h>      // Character checks (isalnum, isdigit, isalpha)
+#include <sys/types.h>  // Process and file types (pid_t, etc.)
+#include <sys/wait.h>   // Process control (wait, waitpid)
+```
 
 > Error handling:
+>
+> Prints help text if invalid arguments are given.
+```
+Example Output:
+Usage:
+  ./action             # Untuk download dan ekstrak Clues.zip
+  ./action -m Filter   # Untuk filter file menjadi 1 huruf/angka
+  ./action -m Combine  # Untuk menggabungkan isi file
+  ./action -m Decode   # Untuk mendecode isi Combined.txt (ROT13)
+```
 
 
 ## Soal 2
